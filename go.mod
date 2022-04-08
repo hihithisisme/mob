@@ -1,3 +1,3 @@
-module github.com/remotemobprogramming/mob/v3
+module github.com/hihithisisme/mob/v3
 
 go 1.15
