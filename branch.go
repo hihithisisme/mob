@@ -57,6 +57,9 @@ func (branch Branch) addWipPrefix(configuration Configuration) Branch {
 
 func (branch Branch) addWipQualifier(configuration Configuration) Branch {
 	if configuration.customWipBranchQualifierConfigured() {
+		if branch.Name == configuration.WipBranchPrefix {
+			return newBranch(addSuffix(branch.Name, configuration.WipBranchQualifier))
+		}
 		return newBranch(addSuffix(branch.Name, configuration.wipBranchQualifierSuffix()))
 	}
 	return branch
@@ -165,20 +168,40 @@ func determineBranches(currentBranch Branch, localBranches []string, configurati
 		// DEPRECATED
 		baseBranch = newBranch("master")
 		wipBranch = newBranch("mob-session")
-	} else if currentBranch.IsWipBranch(configuration) {
-		baseBranch = currentBranch.removeWipPrefix(configuration).removeWipQualifier(localBranches, configuration)
-		wipBranch = currentBranch
 	} else {
-		baseBranch = currentBranch
-		wipBranch = currentBranch.addWipPrefix(configuration).addWipQualifier(configuration)
+		baseBranch = getBaseBranch(currentBranch, localBranches, configuration)
+		wipBranch = getWipBranch(currentBranch, configuration)
 	}
 
 	debugInfo("on currentBranch " + currentBranch.String() + " => BASE " + baseBranch.String() + " WIP " + wipBranch.String() + " with allLocalBranches " + strings.Join(localBranches, ","))
-	if currentBranch != baseBranch && currentBranch != wipBranch {
+	if currentBranch != baseBranch && currentBranch != wipBranch && !configuration.customFixedBaseBranchConfigured() {
 		// this is unreachable code, but we keep it as a backup
 		panic("assertion failed! neither on base nor on wip branch")
 	}
 	return
+}
+
+func getWipBranch(currentBranch Branch, configuration Configuration) Branch {
+	if currentBranch.IsWipBranch(configuration) {
+		return currentBranch
+	}
+
+	var branch Branch
+	if configuration.customFixedBaseBranchConfigured() && configuration.customWipBranchQualifierConfigured() {
+		branch = newBranch("")
+	} else {
+		branch = currentBranch
+	}
+	return branch.addWipPrefix(configuration).addWipQualifier(configuration)
+}
+
+func getBaseBranch(currentBranch Branch, localBranches []string, configuration Configuration) Branch {
+	if configuration.customFixedBaseBranchConfigured() {
+		return newBranch(configuration.FixedBaseBranch)
+	} else if currentBranch.IsWipBranch(configuration) {
+		return currentBranch.removeWipPrefix(configuration).removeWipQualifier(localBranches, configuration)
+	}
+	return currentBranch
 }
 
 func getWipBranchesForBaseBranch(currentBaseBranch Branch, configuration Configuration) []string {
